@@ -1,10 +1,10 @@
 {
   "id": "html-widget-embed",
   "name": "HTML Widget Embed",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minAppVersion": "0.15.0",
-  "description": "Embed a vault-local HTML file in a note as a sandboxed iframe. Vault-relative paths, works in reading view and live preview.",
+  "description": "Embed a vault-local HTML file in a note as a sandboxed iframe, using ![[file.html]] or an html-embed code block.",
   "author": "MrDongShan",
   "authorUrl": "https://github.com/MrDongShan",
-  "isDesktopOnly": false
+  "isDesktopOnly": true
 }
