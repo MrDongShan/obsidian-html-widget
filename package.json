@@ -1,0 +1,13 @@
+{
+  "name": "obsidian-html-widget",
+  "version": "0.1.0",
+  "description": "Embed a vault-local HTML file in an Obsidian note as a sandboxed iframe.",
+  "main": "main.js",
+  "scripts": {
+    "bump": "node version-bump.mjs",
+    "lint": "node --check main.js"
+  },
+  "keywords": ["obsidian", "obsidian-plugin", "html", "iframe", "embed"],
+  "license": "MIT",
+  "author": "MrDongShan"
+}

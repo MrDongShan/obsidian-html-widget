@@ -1,0 +1,9 @@
+.html-embed-wrap { margin: 0.9em 0; }
+.html-embed-wrap iframe {
+  width: 100%; display: block; border: 0; border-radius: 8px;
+  background: transparent; color-scheme: light dark;
+}
+.html-embed-error {
+  font-size: 0.85em; opacity: 0.75; line-height: 1.6;
+  border-left: 2px solid var(--text-error); padding-left: 8px;
+}

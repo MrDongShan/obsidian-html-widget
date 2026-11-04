@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>矩阵乘法 · 步进演示</title>
+<style>
+  :root{
+    --bg:#fbfaf8; --fg:#191917; --muted:#8a857c; --line:#ddd8d0; --cell:#ffffff;
+    --a:#b45309; --aTint:#fdf0dc;
+    --b:#0f766e; --bTint:#ddf3f0;
+    --c:#1d4ed8; --cTint:#e4ecfd;
+    --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI",system-ui,sans-serif;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#131315; --fg:#ececeb; --muted:#8b8b88; --line:#333336; --cell:#1c1c1f;
+      --a:#f0b429; --aTint:#33280f;
+      --b:#3ddad0; --bTint:#0f2f2d;
+      --c:#7aa2ff; --cTint:#1a2544;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:32px 24px 44px; background:var(--bg); color:var(--fg);
+    font-family:var(--sans); -webkit-font-smoothing:antialiased;
+  }
+  main{max-width:640px; margin:0 auto}
+  h1{font-size:19px; font-weight:600; letter-spacing:.01em; margin:0}
+  .sub{font-size:13px; line-height:1.7; color:var(--muted); margin:8px 0 0}
+
+  .controls{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:24px 0 28px}
+  button{
+    font:inherit; font-size:13px; padding:7px 12px; border:1px solid var(--line);
+    background:var(--cell); color:var(--fg); border-radius:7px; cursor:pointer;
+    transition:border-color .15s, background .15s, color .15s;
+    font-variant-numeric:tabular-nums;
+  }
+  button:hover{border-color:var(--muted)}
+  button.primary{background:var(--fg); color:var(--bg); border-color:var(--fg); min-width:86px}
+  button.primary:hover{opacity:.85}
+  button:disabled{opacity:.35; cursor:default; border-color:var(--line)}
+  .speed{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--muted); margin-left:4px}
+  input[type=range]{width:78px; accent-color:var(--muted); cursor:pointer}
+  .counter{margin-left:auto; font-family:var(--mono); font-size:12.5px; color:var(--muted)}
+  .counter b{color:var(--fg); font-weight:600}
+
+  .board{display:flex; align-items:center; justify-content:center; gap:16px; flex-wrap:wrap}
+  .matrix{position:relative; padding-top:15px; display:grid; gap:4px; grid-template-columns:repeat(var(--cols),auto)}
+  .matrix .tag{position:absolute; top:0; left:1px; font-size:11px; letter-spacing:.1em; color:var(--muted)}
+  .op{font-size:17px; color:var(--muted); line-height:1}
+
+  .cell{
+    width:48px; height:44px; display:grid; place-items:center;
+    background:var(--cell); border:1px solid var(--line); border-radius:5px;
+    font:500 15px/1 var(--mono); font-variant-numeric:tabular-nums;
+    transition:background .18s, border-color .18s, color .18s, opacity .18s;
+  }
+  .on-a{background:var(--aTint); border-color:var(--a); color:var(--a); font-weight:600}
+  .on-b{background:var(--bTint); border-color:var(--b); color:var(--b); font-weight:600}
+  .on-c{background:var(--cTint); border-color:var(--c); color:var(--c); font-weight:600}
+  .dim{opacity:.42}
+  .trace{opacity:.95; border-style:dashed; border-color:var(--muted)}
+  .cur{border:1px dashed var(--c)}
+  .m-c .cell{cursor:pointer}
+  .m-c .cell:hover{border-color:var(--c)}
+
+  .expr{
+    font-family:var(--mono); font-size:14px; line-height:1.9; letter-spacing:.01em;
+    min-height:26px; margin:28px 0 0; text-align:center; font-variant-numeric:tabular-nums;
+  }
+  .expr .u{color:var(--muted)}
+  .hint{font-size:12.5px; line-height:1.7; color:var(--muted); margin:16px 0 0; text-align:center}
+</style>
+</head>
+<body>
+<main>
+  <h1>A × B，一格一格地算</h1>
+  <p class="sub">每一步只做一次「乘 + 加」。点结果里的任意一格，就跳到算出它的那一步。</p>
+
+  <div class="controls">
+    <button data-act="reset" title="回到第一步">⟲</button>
+    <button data-act="prev" title="上一步">◀</button>
+    <button data-act="play" class="primary">▶ 播放</button>
+    <button data-act="next" title="下一步">▶</button>
+    <label class="speed">速度<input type="range" min="1" max="5" step="1" value="3"></label>
+    <span class="counter"><b id="stepNo">0</b> / <span id="stepTotal">0</span></span>
+  </div>
+
+  <div class="board">
+    <div class="matrix m-a" style="--cols:3"><span class="tag">A</span>
+      <div class="cell" data-i="0" data-j="0" data-v="1">1</div>
+      <div class="cell" data-i="0" data-j="1" data-v="2">2</div>
+      <div class="cell" data-i="0" data-j="2" data-v="3">3</div>
+      <div class="cell" data-i="1" data-j="0" data-v="4">4</div>
+      <div class="cell" data-i="1" data-j="1" data-v="5">5</div>
+      <div class="cell" data-i="1" data-j="2" data-v="6">6</div>
+    </div>
+    <div class="op">×</div>
+    <div class="matrix m-b" style="--cols:2"><span class="tag">B</span>
+      <div class="cell" data-i="0" data-j="0" data-v="7">7</div>
+      <div class="cell" data-i="0" data-j="1" data-v="8">8</div>
+      <div class="cell" data-i="1" data-j="0" data-v="9">9</div>
+      <div class="cell" data-i="1" data-j="1" data-v="10">10</div>
+      <div class="cell" data-i="2" data-j="0" data-v="11">11</div>
+      <div class="cell" data-i="2" data-j="1" data-v="12">12</div>
+    </div>
+    <div class="op">=</div>
+    <div class="matrix m-c" style="--cols:2"><span class="tag">C</span>
+      <div class="cell" data-i="0" data-j="0">58</div>
+      <div class="cell" data-i="0" data-j="1">64</div>
+      <div class="cell" data-i="1" data-j="0">139</div>
+      <div class="cell" data-i="1" data-j="1">154</div>
+    </div>
+  </div>
+
+  <p class="expr" id="expr"></p>
+  <p class="hint">空格 播放/暂停 · ← → 单步 · R 重置</p>
+</main>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const cellsA = [...document.querySelectorAll('.m-a .cell')];
+  const cellsB = [...document.querySelectorAll('.m-b .cell')];
+  const cellsC = [...document.querySelectorAll('.m-c .cell')];
+
+  // 数据只有一个来源：DOM 上的 data-v。关掉 JS 时表格照样是完整的。
+  const readM = (cells) => {
+    const m = [];
+    for (const c of cells) {
+      const i = +c.dataset.i, j = +c.dataset.j;
+      (m[i] ??= [])[j] = +c.dataset.v;
+    }
+    return m;
+  };
+  const A = readM(cellsA), B = readM(cellsB);
+  const R = A.length, N = B.length, K = B[0].length;
+
+  const C = Array.from({ length: R }, () => Array(K).fill(0));
+  for (let i = 0; i < R; i++)
+    for (let j = 0; j < K; j++)
+      for (let k = 0; k < N; k++) C[i][j] += A[i][k] * B[k][j];
+
+  // 步骤表：每个 (i,j) 有 N 次乘加 + 1 次落笔。
+  const steps = [];
+  for (let i = 0; i < R; i++)
+    for (let j = 0; j < K; j++) {
+      for (let k = 0; k < N; k++) steps.push({ i, j, k, commit: false });
+      steps.push({ i, j, commit: true });
+    }
+
+  const key = (i, j) => i + ',' + j;
+  const mapA = new Map(cellsA.map((c) => [key(c.dataset.i, c.dataset.j), c]));
+  const mapB = new Map(cellsB.map((c) => [key(c.dataset.i, c.dataset.j), c]));
+  const mapC = new Map(cellsC.map((c) => [key(c.dataset.i, c.dataset.j), c]));
+
+  // 每个结果格属于哪一步（用于「点格子跳转」）
+  const commitAt = new Map();
+  steps.forEach((s, n) => { if (s.commit) commitAt.set(key(s.i, s.j), n); });
+
+  let s = 0;               // 已完成的步数
+  let timer = null;
+  const SPEEDS = [900, 620, 420, 260, 140];
+
+  const label = (i, j) => `C<sub>${i}${j}</sub>`;
+  const term = (i, j, k) => `${A[i][k]}<span class="u">×</span>${B[k][j]}`;
+
+  function render() {
+    const active = s > 0 ? steps[s - 1] : null;
+    const committed = new Set();
+    for (let n = 0; n < s; n++) if (steps[n].commit) committed.add(key(steps[n].i, steps[n].j));
+
+    // 清空所有状态
+    for (const c of [...cellsA, ...cellsB, ...cellsC])
+      c.classList.remove('on-a', 'on-b', 'on-c', 'dim', 'cur', 'trace');
+
+    // A / B：除当前算到的两个数，其余压暗
+    for (const c of cellsA.concat(cellsB)) c.classList.add('dim');
+    if (active && !active.commit) {
+      mapA.get(key(active.i, active.k))?.classList.remove('dim');
+      mapA.get(key(active.i, active.k))?.classList.add('on-a');
+      mapB.get(key(active.k, active.j))?.classList.remove('dim');
+      mapB.get(key(active.k, active.j))?.classList.add('on-b');
+    }
+    // 落笔时，把「哪一行乘哪一列」用虚线框标出来
+    if (active && active.commit) {
+      for (const c of cellsA) if (+c.dataset.i === active.i) { c.classList.remove('dim'); c.classList.add('trace'); }
+      for (const c of cellsB) if (+c.dataset.j === active.j) { c.classList.remove('dim'); c.classList.add('trace'); }
+    }
+
+    // C：算完的显示值，没算的显示占位
+    for (const c of cellsC) {
+      const kk = key(c.dataset.i, c.dataset.j);
+      const done = committed.has(kk);
+      c.innerHTML = done ? String(C[c.dataset.i][c.dataset.j]) : '·';
+      if (done) c.classList.remove('dim');
+    }
+    if (active) {
+      const cur = mapC.get(key(active.i, active.j));
+      if (active.commit) { cur.classList.add('on-c'); cur.classList.remove('dim'); }
+      else if (!committed.has(key(active.i, active.j))) { cur.classList.add('cur'); cur.classList.remove('dim'); }
+    }
+
+    // 表达式行
+    const e = $('#expr');
+    if (!active) {
+      e.innerHTML = '点「播放」，或者用 ◀ ▶ 单步。';
+    } else if (active.commit) {
+      const { i, j } = active;
+      const parts = Array.from({ length: N }, (_, k) => term(i, j, k)).join(' <span class="u">+</span> ');
+      e.innerHTML = `${label(i, j)} <span class="u">=</span> ${parts} <span class="u">=</span> ${C[i][j]}`;
+    } else {
+      const { i, j, k } = active;
+      const parts = Array.from({ length: k + 1 }, (_, t) => term(i, j, t)).join(' <span class="u">+</span> ');
+      const tail = k === N - 1 ? '' : ' <span class="u">+ …</span>';
+      e.innerHTML = `${label(i, j)} <span class="u">=</span> ${parts}${tail}`;
+    }
+
+    $('#stepNo').textContent = s;
+    $('[data-act=prev]').disabled = s === 0;
+    $('[data-act=next]').disabled = s === steps.length;
+  }
+
+  function stop() {
+    clearInterval(timer); timer = null;
+    $('[data-act=play]').textContent = '▶ 播放';
+  }
+  function start() {
+    if (s >= steps.length) s = 0;
+    const tick = () => {
+      if (s < steps.length) { s++; render(); }
+      if (s >= steps.length) stop();
+    };
+    const v = +document.querySelector('input[type=range]').value;
+    clearInterval(timer);
+    timer = setInterval(tick, SPEEDS[v - 1]);
+    $('[data-act=play]').textContent = '❚❚ 暂停';
+    tick();
+  }
+  function next() { if (s < steps.length) { s++; render(); } }
+  function prev() { if (s > 0) { s--; render(); } }
+
+  $('#stepTotal').textContent = steps.length;
+
+  document.querySelector('.controls').addEventListener('click', (ev) => {
+    const b = ev.target.closest('button'); if (!b) return;
+    const act = b.dataset.act;
+    if (act === 'play') { timer ? stop() : start(); return; }
+    stop();
+    if (act === 'next') next();
+    if (act === 'prev') prev();
+    if (act === 'reset') { s = 0; render(); }
+  });
+
+  document.querySelector('input[type=range]').addEventListener('input', () => {
+    if (timer) { stop(); start(); }
+  });
+
+  // 点结果格 → 跳到算出它的那一步
+  document.querySelector('.m-c').addEventListener('click', (ev) => {
+    const c = ev.target.closest('.cell'); if (!c) return;
+    stop();
+    s = commitAt.get(key(c.dataset.i, c.dataset.j)) + 1;
+    render();
+  });
+
+  addEventListener('keydown', (ev) => {
+    if (ev.key === ' ' || ev.key === 'Spacebar') { ev.preventDefault(); timer ? stop() : start(); }
+    if (ev.key === 'ArrowRight') { stop(); next(); }
+    if (ev.key === 'ArrowLeft') { stop(); prev(); }
+    if (ev.key === 'r' || ev.key === 'R') { stop(); s = 0; render(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
