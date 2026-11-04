@@ -3,29 +3,43 @@
  * HTML Widget Embed
  *
  * 把 vault 里的一个 .html 文件渲染成内联的沙盒 iframe。
- * 支持两种写法：
- *   ![[widget.html]]        原生嵌入（高度默认 420）
- *   ![[widget.html|480]]    指定高度
- *   ```html-embed           代码块（可写路径 + height）
- * 只用公开 API：registerMarkdownCodeBlockProcessor / registerMarkdownPostProcessor /
- * metadataCache.getFirstLinkpathDest
+ * 两种写法：
+ *   ![[widget.html]]        默认高度自适应（量内容，不出滚动条）
+ *   ![[widget.html|520]]    固定 520px；写 |auto 或不写数字都是自适应
+ *   ```html-embed           代码块：路径 + height: 520（或 height: auto）
  */
 const { Plugin } = require('obsidian');
 
-const DEFAULT_HEIGHT = 420;
 const SANDBOX = 'allow-scripts allow-forms allow-modals allow-popups';
+
+// 注入到组件里的测高脚本：量完用 postMessage 报给宿主。
+// 因为 iframe 没有 allow-same-origin，父文档读不到它的 DOM，只能这样通信。
+const REPORTER = `<script>(function(){
+  var last=-1;
+  function post(){
+    var d=document.documentElement,b=document.body;
+    var h=Math.max(d?d.scrollHeight:0,b?b.scrollHeight:0,d?d.offsetHeight:0);
+    if(h>0&&h!==last){last=h;try{parent.postMessage({__htmlWidgetHeight:h},'*')}catch(e){}}
+  }
+  window.addEventListener('load',post);
+  if(window.ResizeObserver){try{new ResizeObserver(post).observe(document.documentElement)}catch(e){}}
+  [0,60,200,600,1200].forEach(function(t){setTimeout(post,t)});
+})();</script>`;
+
+function injectReporter(html) {
+  const at = html.toLowerCase().lastIndexOf('</body>');
+  return at === -1 ? html + REPORTER : html.slice(0, at) + REPORTER + html.slice(at);
+}
 
 function parseBlock(source) {
   const lines = source.split('\n').map((line) => line.trim()).filter(Boolean);
-  let height = DEFAULT_HEIGHT;
+  let height = 'auto';
   let fileRef = '';
 
   for (const line of lines) {
-    const heightMatch = line.match(/^height\s*[:=]\s*(\d+)\s*$/i);
-    if (heightMatch) {
-      height = parseInt(heightMatch[1], 10);
-      continue;
-    }
+    const fixed = line.match(/^height\s*[:=]\s*(\d+)\s*$/i);
+    if (fixed) { height = parseInt(fixed[1], 10); continue; }
+    if (/^height\s*[:=]\s*auto\s*$/i.test(line)) { height = 'auto'; continue; }
     if (!fileRef) fileRef = line;
   }
 
@@ -50,6 +64,18 @@ module.exports = class HtmlWidgetEmbedPlugin extends Plugin {
       this.renderCodeBlock(source, el, ctx)
     );
     this.registerMarkdownPostProcessor((el, ctx) => this.renderEmbeds(el, ctx));
+
+    // 单个全局监听：谁报高度，就把对应 iframe 撑到多高
+    this.registerDomEvent(window, 'message', (event) => {
+      const height = event.data && event.data.__htmlWidgetHeight;
+      if (typeof height !== 'number' || height <= 0) return;
+      for (const frame of document.querySelectorAll('.html-embed-wrap iframe')) {
+        if (frame.contentWindow === event.source) {
+          frame.style.height = Math.ceil(height) + 'px';
+          break;
+        }
+      }
+    });
   }
 
   async renderCodeBlock(source, el, ctx) {
@@ -85,13 +111,14 @@ module.exports = class HtmlWidgetEmbedPlugin extends Plugin {
       if (!file || file.extension !== 'html') continue;
 
       embed.dataset.htmlWidget = '1';
-      // Obsidian 把 ![[x.html|480]] 里的 480 放进 width 属性；这里当作高度用。
-      const size = embed.getAttribute('width') || embed.getAttribute('alt') || '';
-      const height = parseInt(size, 10) || DEFAULT_HEIGHT;
-      const wrap = createDiv({ cls: 'html-embed-wrap' });
 
-      const target = replaceTarget(embed);
-      target.replaceWith(wrap);
+      // Obsidian 把 ![[x.html|480]] 的 480 放进 width 属性；非数字（含 auto）即自适应
+      const size = embed.getAttribute('width') || embed.getAttribute('alt') || '';
+      const parsed = parseInt(size, 10);
+      const height = Number.isFinite(parsed) ? parsed : 'auto';
+
+      const wrap = createDiv({ cls: 'html-embed-wrap' });
+      replaceTarget(embed).replaceWith(wrap);
       await this.mount(wrap, file, height);
     }
   }
@@ -105,15 +132,17 @@ module.exports = class HtmlWidgetEmbedPlugin extends Plugin {
       return;
     }
 
+    const auto = height === 'auto';
     const frame = wrap.createEl('iframe', {
       attr: {
         sandbox: SANDBOX,
+        scrolling: 'no',
         loading: 'lazy',
-        style: 'height:' + height + 'px',
+        style: auto ? 'height:1px' : 'height:' + height + 'px',
         title: file.basename,
       },
     });
-    frame.srcdoc = html;
+    frame.srcdoc = auto ? injectReporter(html) : html;
   }
 
   resolveFile(reference, sourcePath) {

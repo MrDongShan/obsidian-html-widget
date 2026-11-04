@@ -22,9 +22,12 @@ height: 470
 
 | Form | Height | Notes |
 | --- | --- | --- |
-| `![[file.html]]` | 420 | Resolved like any wikilink — relative to the note, then across the vault |
-| `![[file.html\|520]]` | 520 | The number after `\|` is used as pixel height |
-| `html-embed` block | `height: N` | Explicit path, useful when the path is long or lives outside the note's folder |
+| `![[file.html]]` | auto | Resolved like any wikilink — relative to the note, then across the vault |
+| `![[file.html\|520]]` | 520 | The number after `\|` pins the pixel height |
+| `![[file.html\|auto]]` | auto | Same as omitting it |
+| `html-embed` block | `height: 470` or `height: auto` | Explicit path, useful when the path is long or lives outside the note's folder |
+
+**Height adapts to the content by default.** The plugin injects a tiny measuring script into the frame and receives the content height over `postMessage` (the sandbox has no same-origin access, so the frame cannot be measured directly). The iframe is sized to fit, so widgets don't get scrollbars. Give a number when you want a fixed height instead. The frame re-measures on resize, so content that grows later still fits.
 
 A missing file renders a one-line notice instead of breaking the note.
 
@@ -83,8 +86,8 @@ Release tags must equal `manifest.json`'s version (no `v` prefix), and every rel
 
 把 vault 里的 `.html` 文件渲染成笔记里的可交互组件，两种写法都行：
 
-- `![[组件.html]]`：当成普通嵌入用，高度 420
-- `![[组件.html|520]]`：`|` 后面的数字当高度
+- `![[组件.html]]`：当成普通嵌入用，**高度自动贴合内容**，不出滚动条
+- `![[组件.html|520]]`：`|` 后面的数字固定高度
 - `html-embed` 代码块：路径 + `height: 470`
 
 路径走 Obsidian 自己的链接解析，vault 搬家、换设备都不会断。组件运行在沙盒里，摸不到 Obsidian 的 API。仅桌面端。
