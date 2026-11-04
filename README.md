@@ -4,6 +4,8 @@ Embed a vault-local `.html` file inside an Obsidian note as a sandboxed iframe �
 
 Obsidian embeds notes, images and PDFs, but an `.html` file in your vault is only a file you can open. This plugin renders it inline, with the JavaScript running, and without hardcoding absolute paths.
 
+![A widget embedded with ![[file.html]]](images/reading-view.png)
+
 ## Usage
 
 Two ways to embed:
@@ -26,6 +28,10 @@ height: 470
 | `![[file.html\|520]]` | 520 | The number after `\|` pins the pixel height |
 | `![[file.html\|auto]]` | auto | Same as omitting it |
 | `html-embed` block | `height: 470` or `height: auto` | Explicit path, useful when the path is long or lives outside the note's folder |
+
+Both forms render in **reading view**. The `html-embed` block also renders in **live preview**; `![[file.html]]` shows Obsidian's file card there, because live preview does not run post processors on file embeds.
+
+![The code block form in live preview](images/live-preview.png)
 
 **Height adapts to the content by default.** The plugin injects a tiny measuring script into the frame and receives the content height over `postMessage` (the sandbox has no same-origin access, so the frame cannot be measured directly). The iframe is sized to fit, so widgets don't get scrollbars. Give a number when you want a fixed height instead. The frame re-measures on resize, so content that grows later still fits.
 
@@ -88,7 +94,7 @@ Release tags must equal `manifest.json`'s version (no `v` prefix), and every rel
 
 - `![[组件.html]]`：当成普通嵌入用，**高度自动贴合内容**，不出滚动条
 - `![[组件.html|520]]`：`|` 后面的数字固定高度
-- `html-embed` 代码块：路径 + `height: 470`
+- `html-embed` 代码块：路径 + `height: 470`（阅读视图和实时预览都能显示；`![[...]]` 只在阅读视图显示）
 
 路径走 Obsidian 自己的链接解析，vault 搬家、换设备都不会断。组件运行在沙盒里，摸不到 Obsidian 的 API。仅桌面端。
 

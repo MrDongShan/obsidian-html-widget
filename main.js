@@ -98,29 +98,66 @@ module.exports = class HtmlWidgetEmbedPlugin extends Plugin {
 
   /** ![[x.html]] / ![[x.html|480]] */
   async renderEmbeds(el, ctx) {
-    const embeds = Array.from(el.querySelectorAll('.internal-embed[src]'));
+    let queued = false;
+    let busy = false;
 
-    for (const embed of embeds) {
-      if (embed.dataset.htmlWidget === '1') continue;
+    const scan = async () => {
+      queued = false;
+      if (!el.isConnected) return;
+      if (busy) return;
+      busy = true;
 
-      const raw = embed.getAttribute('src') || '';
-      if (!raw) continue;
+      // 阅读视图里 el 是段落/区块容器；实时预览里 el 本身可能就是嵌入元素
+      const embeds = [];
+      if (el.matches && el.matches('.internal-embed[src]')) embeds.push(el);
+      embeds.push(...el.querySelectorAll('.internal-embed[src]'));
+      for (const embed of embeds) {
+        if (embed.dataset.htmlWidget === '1') continue;
 
-      const ref = decodeURIComponent(raw.split('#')[0]);
-      const file = this.resolveFile(ref, ctx.sourcePath);
-      if (!file || file.extension !== 'html') continue;
+        const raw = embed.getAttribute('src') || '';
+        if (!raw) continue;
 
-      embed.dataset.htmlWidget = '1';
+        let ref = raw.split('#')[0];
+        try {
+          ref = decodeURIComponent(ref);
+        } catch (error) {
+          /* 保持原样 */
+        }
 
-      // Obsidian 把 ![[x.html|480]] 的 480 放进 width 属性；非数字（含 auto）即自适应
-      const size = embed.getAttribute('width') || embed.getAttribute('alt') || '';
-      const parsed = parseInt(size, 10);
-      const height = Number.isFinite(parsed) ? parsed : 'auto';
+        const file = this.resolveFile(ref, ctx.sourcePath);
+        if (!file || file.extension !== 'html') continue;
 
-      const wrap = createDiv({ cls: 'html-embed-wrap' });
-      replaceTarget(embed).replaceWith(wrap);
-      await this.mount(wrap, file, height);
-    }
+        embed.dataset.htmlWidget = '1';
+
+        // Obsidian 把 ![[x.html|480]] 的 480 放进 width 属性；非数字（含 auto）即自适应
+        const size = embed.getAttribute('width') || embed.getAttribute('alt') || '';
+        const parsed = parseInt(size, 10);
+        const height = Number.isFinite(parsed) ? parsed : 'auto';
+
+        const wrap = createDiv({ cls: 'html-embed-wrap' });
+        replaceTarget(embed).replaceWith(wrap);
+        await this.mount(wrap, file, height);
+      }
+
+      busy = false;
+    };
+
+    // Obsidian 先渲染出 .internal-embed 的外壳，再异步填充内容；
+    // 只在 post processor 里扫一遍会漏掉还没插进来的那些，所以持续观察。
+    const observer = new MutationObserver(() => {
+      if (queued) return;
+      queued = true;
+      Promise.resolve().then(scan);
+    });
+    observer.observe(el, { childList: true, subtree: true });
+    await scan();
+
+    const teardown = window.setInterval(() => {
+      if (!el.isConnected) {
+        observer.disconnect();
+        window.clearInterval(teardown);
+      }
+    }, 4000);
   }
 
   async mount(wrap, file, height) {
